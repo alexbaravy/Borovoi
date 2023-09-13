@@ -1,0 +1,112 @@
+1.	Создать таблицу с заданными ограничениями и полями. Заполнить данные 15 актёров.
+
+CREATE TABLE actors (
+	actor_id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT not null,
+	surname TEXT not null,
+	age INTEGER CHECK (age>=5 AND age<=99),
+	movie TEXT,
+	budget INTEGER,
+	manager TEXT,
+	release INTEGER CHECK (release>=1895 AND release<=2100),
+	sex TEXT CHECK (sex='m' or sex='f')
+);
+
+INSERT INTO actors
+(name, surname, age, movie, budget, manager, "release", sex)
+VALUES
+('Tom','Hanks','67','Forrest Gump','55000000','Robert Zemeckis','1994','m'),
+('Meryl','Streep','74','The Devil Wears Prada','35000000','David Frankel','2006','f'),
+('Leonardo','DiCaprio','48','Inception','160000000','Christopher Nolan','2010','m'),
+('Scarlett','Johansson','38','The Avengers','220000000','Joss Whedon','2012','f'),
+('Brad','Pitt','59','Fight Club','63000000','David Fincher','1999','m'),
+('Angelina','Jolie','48','Maleficent','180000000','Robert Stromberg','2014','f'),
+('Denzel','Washington','68','Training Day','45000000','Antoine Fuqua','2001','m'),
+('Sandra','Bullock','59','Gravity','100000000','Alfonso Cuarón','2013','f'),
+('Johnny','Depp','60','Pirates of the Caribbean: The Curse of the Black Pearl','140000000','Gore Verbinski','2003','m'),
+('Julia','Roberts','56','Pretty Woman','14000000','Garry Marshall','1990','f'),
+('Robert','Downey Jr.','58','Iron Man','140000000','Jon Favreau','2008','m'),
+('Charlize','Theron','48','Mad Max: Fury Road','150000000','George Miller','2015','f'),
+('Harrison','Ford','81','Raiders of the Lost Ark','18000000','Steven Spielberg','1981','m'),
+('Anne','Hathaway','40','Les Misérables','61000000','Tom Hooper','2012','f'),
+('Keanu','Reeves','59','The Matrix','63000000','The Wachowskis','1999','m')
+
+2.	Создать колонку finance REAL, заполнить значение гонораров за фильмы. 
+ALTER table actors ADD COLUMN finance REAL
+
+3.	Переименовать колонку finance в finance_actors. Добавить колонку city, где проживают актёры в данный момент и внести все изменения в таблицу.
+ALTER table actors RENAME COLUMN finance to finance_actors
+ALTER table actors ADD COLUMN city TEXT
+
+4.	 Добавить несколько актёров мужского и женского пола, которые снимались в фильмах, которые мы написали. Добавить ещё несколько известных актёров и фильмов с их участием.
+INSERT INTO actors
+(name, surname, age, movie, budget, manager, "release", sex, finance_actors, city)
+VALUES
+('Natalie','Portman','42','Black Swan','13000000','Darren Aronofsky','2010','f','12000000','Los Angeles'),
+('Chris','Hemsworth','39','Thor','150000000','Kenneth Branagh','2011','m','10000000','Los Angeles'),
+('Jennifer','Lawrence','33','The Hunger Games','78000000','Gary Ross','2012','f','12000000','Los Angeles'),
+('Matt','Damon','52','The Bourne Identity','60000000','Doug Liman','2002','m','10000000','Los Angeles'),
+('Emma','Stone','34','La La Land','30000000','Damien Chazelle','2016','f','15000000','Los Angeles')
+
+5.	Вывести всех актёров которые снимались в период с 1990 по 2000 год. Актёры должны быть выведены только 1 раз.
+
+SELECT DISTINCT name, surname FROM actors WHERE "release" BETWEEN 1990 and 2000
+
+6.	Вывести все фильмы в которых приняли участие 2 и более актёра из нашей базы данных. Вывод организовать в порядке возрастания фамилий!
+SELECT name, surname, movie  FROM actors WHERE movie IN (SELECT movie FROM actors GROUP BY movie  HAVING COUNT(movie)>1) ORDER BY surname 
+
+Но может быть эффективнее:
+SELECT a.name, a.surname, a.movie
+FROM actors a
+JOIN (
+    SELECT movie
+    FROM actors
+    GROUP BY movie
+    HAVING COUNT(movie) > 1
+) b ON a.movie = b.movie
+ORDER BY a.surname;
+
+7.	Вывести количество актёров мужского пола, которые есть в таблице которые старше 55 лет.
+SELECT DISTINCT name, surname FROM actors WHERE age>55
+
+8.	Вывести всех актёров которые приняли участие в 2-х и более фильмах, которые есть а бд и которые имеют на своём счету 10000000$.
+
+SELECT surname, SUM(finance_actors)
+FROM actors
+GROUP BY surname
+HAVING COUNT(surname) > 1 AND SUM(finance_actors) > 10000000
+
+9.	Вывести общую сумму всех гонораров актёров в фильмах снятых в период с 1995 по 2005 год.
+
+SELECT sum(finance_actors) FROM actors WHERE "release" BETWEEN 1995 AND 2005
+
+10.	Вывести фильмы и имена и фамилии актёров, которым на момент выпуска фильма в прокат было меньше 35 лет.
+
+SELECT movie, name, surname, age-(2023-"release") as age_at_release FROM actors WHERE age-(2023-"release")<35
+
+11.	Вывести все фильмы название которых состоит из 2 слов. Использовать регулярные выражения.
+Не удалось с расширением REGEXP для sqlite, поэтому через модуль RE
+
+import sqlite3
+import re
+
+def regexp(expr, item):
+    reg = re.compile(expr)
+    return reg.search(item) is not None
+
+
+conn = sqlite3.connect('Actors')
+conn.create_function("REGEXP", 2, regexp)
+cur = conn.cursor()
+cur.execute("SELECT * FROM actors WHERE movie REGEXP '^\w+\s\w+$'")
+results = cur.fetchall()
+for line in results:
+    print(line)
+
+
+12.	Вывести  фильмы и общие выплаты актёрам. В порядке убывания общей суммы гонораров. Вывести первые 5 фильмов.
+SELECT movie, sum(finance_actors) as fa  FROM actors GROUP BY movie HAVING sum(finance_actors) ORDER BY fa DESC LIMIT 5
+
+13.	Вывести  фильм в котором приняло участие большее число актёров из вашей бд.
+
+SELECT movie, count(*) as count_actors FROM actors GROUP BY movie ORDER BY COUNT(movie) DESC LIMIT 1
